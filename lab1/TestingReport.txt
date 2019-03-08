@@ -1,0 +1,9 @@
+for CollatzConjecture.c:
+  program will ask for an int input which must be greater than 0 during run time;
+  when user input an legal int program will display the collatz conjecture;
+
+for filecopy.c:
+  to start the program, needs to input as: filiecopy 'copy file' 'copyTo file' format
+  if everything goes right, program will copy the data in 'copy file' into 'copyTo file'; if any part of input or program itself goes wrong, program will display an error message and exit.
+
+problem for filecopy.c: if the 'copyTo file" does not exit, program will create the file and write data in it, but somehow I could not open that file.File copy function running okay if 'copyTo file' already exit.

@@ -1,0 +1,252 @@
+Name: Boen zhang
+CS444
+Lab03
+2018/4/19
+
+How to do Linux 64 syscalls:
+
+-get kernel .gz file from kernel.org,decompress in usr/src
+
+-cd into it and create and dir: root@boen-VirtualBox:/usr/src/linux-4.10.13# mkdir helloworld
+
+-cd into helloword and create helloworld.c and Makefile in this dir:
+root@boen-VirtualBox:/usr/src/linux-4.10.13/helloworld# gedit helloworld.c
+root@boen-VirtualBox:/usr/src/linux-4.10.13/helloworld# gedit makefile
+
+***helloworld.c
+
+#include <linux/kernel.h>
+
+asmlinkage long sys_helloworld(void){
+	printk("Hello World\n");
+	return 0;
+}
+
+***Makefile:
+obj-y := helloworld.o
+
+-when finish back to linux-4.10 dir and chage it Makefile: root@boen-VirtualBox:/usr/src/linux-4.10.13# gedit Makefile
+	to change this Makefile we need to find its core-y locate line and add the dir we made into it:
+	***like this:
+	ifeq ($(KBUILD_EXTMOD),)
+	core-y		+= kernel/ certs/ mm/ fs/ ipc/ security/ crypto/ block/ helloworld/ #<-- our dir
+
+-now go to arch/x86/entry/syscalls: root@boen-VirtualBox:/usr/src/linux-4.10.13# cd arch/x86/entry/syscalls
+
+-in this dir we need to add the syscalss program we made in syscalss_64.tbl
+like this:
+
+root@boen-VirtualBox:/usr/src/linux-4.10.13/arch/x86/entry/syscalls# gedit syscall_64.tbl
+
+330	common	pkey_alloc		sys_pkey_alloc
+331	common	pkey_free		sys_pkey_free
+332	64	helloworld		sys_helloworld
+
+#
+# x32-specific system call numbers start at 512 to avoid cache impact
+# for native 64-bit operation.
+#
+
+-goto /include/linux and add this syscalls into syscalls.h:
+root@boen-VirtualBox:/usr/src/linux-4.10.13/include/linux# gedit syscalls.h
+
+***add sys_helloworld like this:
+asmlinkage long sys_pkey_mprotect(unsigned long start, size_t len,
+				  unsigned long prot, int pkey);
+asmlinkage long sys_pkey_alloc(unsigned long flags, unsigned long init_val);
+asmlinkage long sys_pkey_free(int pkey);
+
+asmlinkage long sys_helloworld(void);
+
+#endif
+
+
+
+-now we ready to start setup the config, we shall go back to linux 4.10 dir and make config:
+like this: root@boen-VirtualBox:/usr/src/linux-4.10.13# make menuconfig
+	root@boen-VirtualBox:/usr/src/linux-4.10.13# make oldconfig
+
+then type make to start compile our kernel
+...after 2hr compiing we finish the compile and should start install the kernel
+
+like this: root@boen-VirtualBox:/usr/src/linux-4.10.13# make modules_install install
+
+-when finish, restart the os
+-run into problem that the syscall I write not working, spend days to research why. Find out everytime my os resstart it use linux 4.13 because its newer, and syscalls I write is in 4.10, thats why my syscall never work :(((((
+
+-boot os to linux 4.10 and run the testing program and the Helloworld displayed!
+***testing: hello.c
+hello.c
+#include <stdio.h>
+#include <linux/kernel.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+
+int main(){
+	int i=syscall(332);
+	printf("helloWorld %1d \n",i);
+	return 0;
+}
+
+
+-run hello.c:
+boen@boen-VirtualBox:~/Desktop/testing$ gcc hello.c
+boen@boen-VirtualBox:~/Desktop/testing$ ./a.out
+helloworld 0
+
+***part of it: boen@boen-VirtualBox:~/Desktop/testing$ dmesg
+[    7.808039] input: HDA Intel Speaker CLFE as /devices/pci0000:00/0000:00:05.0/sound/card0/input10
+[    7.808066] input: HDA Intel Front Headphone as /devices/pci0000:00/0000:00:05.0/sound/card0/input11
+[    7.808089] input: HDA Intel SPDIF In as /devices/pci0000:00/0000:00:05.0/sound/card0/input12
+[    7.957543] random: crng init done
+[    8.070723] Adding 2095100k swap on /dev/sda5.  Priority:-1 extents:1 across:2095100k FS
+[    8.776128] IPv6: ADDRCONF(NETDEV_UP): enp0s3: link is not ready
+[    8.786116] IPv6: ADDRCONF(NETDEV_UP): enp0s3: link is not ready
+[    8.788293] e1000: enp0s3 NIC Link is Up 1000 Mbps Full Duplex, Flow Control: RX
+[    8.788515] IPv6: ADDRCONF(NETDEV_CHANGE): enp0s3: link becomes ready
+[   10.560063] floppy0: no floppy controllers found
+[   10.560169] work still pending
+[   95.048853] Hello World
+
+you can see the Hello World shows and work!
+
+Extra credit:
+write an "increment" syscall that takes and int parameter and return +1 of it:
+
+-same step with helloworld, just some differents in the code.
+-for kernel:
+
+***increment.c:
+#include <linux/kernel.h>
+
+asmlinkage long sys_increment(int i){
+ printk("increment \n");
+ return i+1;
+}
+
+**Makefile
+obj-y := increment.o
+
+-add it to the syscalls tbl file: 
+
+root@boen-VirtualBox:/usr/src/linux-4.10.13/arch/x86/entry/syscalls# gedit syscall_64.tbl
+
+330	common	pkey_alloc		sys_pkey_alloc
+331	common	pkey_free		sys_pkey_free
+332	64	helloworld		sys_helloworld
+333	64	increment		sys_increment
+
+
+-goto /include/linux and add this syscalls into syscalls.h:
+root@boen-VirtualBox:/usr/src/linux-4.10.13/include/linux# gedit syscalls.h
+
+***add sys_increment like this:
+asmlinkage long sys_pkey_mprotect(unsigned long start, size_t len,
+				  unsigned long prot, int pkey);
+asmlinkage long sys_pkey_alloc(unsigned long flags, unsigned long init_val);
+asmlinkage long sys_pkey_free(int pkey);
+
+asmlinkage long sys_helloworld(void);
+asmlinkage long sys_increment(int i);
+
+#endif
+
+-config and make it then restart to os
+-run the testing program and see the result:
+***inc.c
+#include <stdio.h>
+#include <linux/kernel.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+
+
+
+
+int main(){
+	int i=syscall(333,5);
+	printf("increment %1d \n",i);
+	return 0;
+}
+
+
+-run it
+boen@boen-VirtualBox:~/Desktop/testing$ gcc inc.c
+boen@boen-VirtualBox:~/Desktop/testing$ ./a.out
+increment 6 
+
+-part of the dmesg:
+[    8.031379] input: HDA Intel SPDIF In as /devices/pci0000:00/0000:00:05.0/sound/card0/input12
+[    8.046368] Adding 2095100k swap on /dev/sda5.  Priority:-1 extents:1 across:2095100k FS
+[    8.052877] random: crng init done
+[    8.712072] IPv6: ADDRCONF(NETDEV_UP): enp0s3: link is not ready
+[    8.713172] IPv6: ADDRCONF(NETDEV_UP): enp0s3: link is not ready
+[    8.718825] e1000: enp0s3 NIC Link is Up 1000 Mbps Full Duplex, Flow Control: RX
+[    8.719046] IPv6: ADDRCONF(NETDEV_CHANGE): enp0s3: link becomes ready
+[   10.551248] floppy0: no floppy controllers found
+[   10.551272] work still pending
+[   38.466509] increment 
+boen@boen-VirtualBox:~/Desktop/testing$ 
+
+-in the testing program I hard code the int parameter, scine this is a syscall implementation I think this should be a okay testing program
+
+Extra credit:
+message syscall that takes a string and print it to the system log:
+
+-same step with explain above
+
+*** kernel program: printstr.c:
+#include <linux/kernel.h>
+
+asmlinkage long sys_increment(char str[]){
+ printk("String is: %s",str);
+ return 0;
+}
+
+***Makefile:
+obj-y :=printstr.o
+
+with same edit syscalls.h syscalls_64.tbl, config and make, reboot the os
+
+***testing program printme.c
+#include <stdio.h>
+#include <linux/kernel.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+
+int main(){
+	int i=syscall(332,"hellohello");
+	printf("printstr is running \n");
+	return 0;
+}
+
+use dmesg:
+[    7.158086] input: HDA Intel Front Headphone as /devices/pci0000:00/0000:00:05.0/sound/card0/input11
+[    7.166368] Adding 2095100k swap on /dev/sda5.  Priority:-1 extents:1 across:2095100k FS
+[    7.166677] random: crng init done
+[    7.166712] IPv6: ADDRCONF(NETDEV_UP): enp0s3: link is not ready
+[    7.167070] IPv6: ADDRCONF(NETDEV_UP): enp0s3: link is not ready
+[    7.180021] e1000: enp0s3 NIC Link is Up 1000 Mbps Full Duplex, Flow Control: RX
+[    7.181316] IPv6: ADDRCONF(NETDEV_CHANGE): enp0s3: link becomes ready
+[   11.955938] floppy0: no floppy controllers found
+[   11.959052] work still pending
+[   41.036506] hellohello 
+boen@boen-VirtualBox:~/Desktop/testing$ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
